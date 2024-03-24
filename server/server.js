@@ -10,13 +10,17 @@ const jwt = require("jsonwebtoken");
 app.use(cors());
 app.use(express.json());
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   const token = req.headers["x-token"];
   if (!token) return res.status(401).json({ detail: "Token not present" });
-  const { email } = jwt.decode(token, process.env.JWT_SECRET);
-  if (!email) return res.status(401).json({ detail: "Unauthorized" });
-  req.email = email;
-  next();
+  try {
+    const { email } = await jwt.verify(token, process.env.JWT_SECRET);
+    req.email = email;
+    await next();
+  } catch (err) {
+    console.error(err);
+    return res.status(401).json({ detail: "Unauthorized" });
+  }
 };
 
 /* ------------------- GET ELEMENT FROM DATABASE ----------------------*/
