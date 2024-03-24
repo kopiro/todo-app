@@ -216,6 +216,7 @@ input {
 /*  PROGRESS BAR */
 
 .outer-bar {
+  width: 500px;
   height: 14px;
   background-color: rgb(216, 216, 216);
   border-radius: 7px;

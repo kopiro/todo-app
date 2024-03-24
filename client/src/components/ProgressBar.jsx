@@ -18,12 +18,7 @@ export default function ProgressBar(progress) {
   }, [progress]);
 
   return (
-    <div
-      className="outer-bar"
-      style={{
-        width: `${progress.progress}%`,
-      }}
-    >
+    <div className="outer-bar">
       <div
         className="inner-bar"
         style={{
