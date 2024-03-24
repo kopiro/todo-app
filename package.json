@@ -8,7 +8,6 @@
     "client": "cd client && npm start"
   },
   "dependencies": {
-    "if-env": "^1.0.4",
-    "react-icons": "^5.0.1"
+    "if-env": "^1.0.4"
   }
 }

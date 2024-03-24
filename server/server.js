@@ -10,13 +10,21 @@ const jwt = require("jsonwebtoken");
 app.use(cors());
 app.use(express.json());
 
+const authMiddleware = (req, res, next) => {
+  const token = req.headers["x-token"];
+  if (!token) return res.status(401).json({ detail: "Token not present" });
+  const { email } = jwt.decode(token, process.env.JWT_SECRET);
+  if (!email) return res.status(401).json({ detail: "Unauthorized" });
+  req.email = email;
+  next();
+};
+
 /* ------------------- GET ELEMENT FROM DATABASE ----------------------*/
-app.get("/todos/:userEmail", async (req, res) => {
-  const { userEmail } = req.params;
+app.get("/todos", authMiddleware, async (req, res) => {
   try {
     // qui stai autorizzando l'utente ad accedere alla sua todos
     const todos = await pool.query("SELECT * FROM todos WHERE user_email=$1", [
-      userEmail,
+      req.email,
     ]);
     res.json(todos.rows);
   } catch (err) {
@@ -28,47 +36,71 @@ app.get("/todos/:userEmail", async (req, res) => {
 /* ------------------- POST / INSERT A NEW ELEMENT TO DATABASE   
 (Quando qualcuno fa una post dal lato client, segue questo codice qui)
 ----------------------*/
-app.post("/todos", async (req, res) => {
-  const { user_email, title, progress, date } = req.body;
-  console.log("req.body", req.body);
+app.post("/todos", authMiddleware, async (req, res) => {
+  const { title, progress, date } = req.body;
   const id = uuidv4();
 
   try {
     const newToDo = await pool.query(
       `INSERT INTO todos(id, user_email, title, progress, date) VALUES($1, $2, $3, $4, $5)`,
-      [id, user_email, title, progress, date]
+      [id, req.email, title, progress, date]
     );
     // return new to do response
     res.json(newToDo);
   } catch (error) {
     console.error(error);
+    res.status(500).send({ error });
   }
 });
 
 /* ------------------- EDIT AN ELEMENT AND SEND IT TO DATABASE ----------------------*/
-app.put("/todos/:id", async (req, res) => {
+app.put("/todos/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
-  const { user_email, title, progress, date } = req.body;
 
   try {
+    const todo = await pool.query("SELECT * FROM todos WHERE id=$1", [id]);
+    if (!todo) return res.status(404).json({ detail: "Not found" });
+
+    if (todo.rows[0].user_email !== req.email) {
+      return res
+        .status(401)
+        .json({ detail: "You're not authorized to modify this resource" });
+    }
+
+    const { title, progress, date } = req.body;
+
     const editToDo = await pool.query(
       "UPDATE todos SET user_email = $1, title = $2, progress = $3, date = $4 WHERE id= $5",
-      [user_email, title, progress, date, id]
+      [req.email, title, progress, date, id]
     );
     res.json(editToDo);
   } catch (error) {
     console.error(error);
+    res.status(500).send({ error });
   }
 });
 
 /* ------------------- DELETE AN ELEMENT AND UPDATE THE DATABASE ----------------------*/
-app.delete("/todos/:id", async (req, res) => {
+app.delete("/todos/:id", authMiddleware, async (req, res) => {
   const { id } = req.params;
+
   try {
-    const deleteToDo = await pool.query("DELETE FROM todos WHERE id= $1", [id]);
+    const todo = await pool.query("SELECT * FROM todos WHERE id = $1", [id]);
+    if (!todo) return res.status(404).json({ detail: "Not found" });
+
+    if (todo.rows[0].user_email !== req.email) {
+      return res
+        .status(401)
+        .json({ detail: "You're not authorized to delete this resource" });
+    }
+
+    const deleteToDo = await pool.query("DELETE FROM todos WHERE id = $1", [
+      id,
+    ]);
     res.json(deleteToDo);
   } catch (error) {
     console.error(error);
+    res.status(500).send({ error });
   }
 });
 
@@ -78,19 +110,25 @@ app.post("/signup", async (req, res) => {
   const salt = bcrypt.genSaltSync(10);
   const hashedPassword = bcrypt.hashSync(password, salt);
 
+  const emailRegex =
+    /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  if (!emailRegex.test(email))
+    return res.status(400).json({ detail: "Invalid email" });
+
   try {
     const signUp = await pool.query(
       "INSERT INTO users (email, hashed_password) VALUES($1, $2)",
       [email, hashedPassword]
     );
-    const token = jwt.sign({ email }, "secret", { expiresIn: "1hr" });
-
+    if (signUp.rowCount === 0)
+      return res.status(500).json({ detail: "Sign up failed" });
+    const token = jwt.sign({ email }, process.env.JWT_SECRET, {
+      expiresIn: "1hr",
+    });
     res.json({ email, token });
   } catch (error) {
     console.error(error);
-    if (error) {
-      res.json({ detail: error.detail });
-    }
+    res.status(500).send({ error });
   }
 });
 
@@ -98,16 +136,24 @@ app.post("/signup", async (req, res) => {
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
+  const emailRegex =
+    /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  if (!emailRegex.test(email))
+    return res.status(400).json({ detail: "Invalid email" });
+
   try {
     const users = await pool.query("SELECT * FROM users WHERE email =$1", [
       email,
     ]);
-    if (!users.rows.length) return res.json({ detail: "User does not exist!" });
+    if (!users.rows.length)
+      return res.status(404).json({ detail: "User does not exist!" });
     const success = await bcrypt.compare(
       password,
       users.rows[0].hashed_password
     );
-    const token = jwt.sign({ email }, "secret", { expiresIn: "1hr" });
+    const token = jwt.sign({ email }, process.env.JWT_SECRET, {
+      expiresIn: "1hr",
+    });
     if (success) {
       res.json({ email: users.rows[0].email, token });
     } else {
@@ -115,6 +161,7 @@ app.post("/login", async (req, res) => {
     }
   } catch (error) {
     console.error(error);
+    res.status(500).send({ error });
   }
 });
 

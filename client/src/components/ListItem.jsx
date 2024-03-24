@@ -2,8 +2,10 @@ import { useState } from "react";
 import ProgressBar from "./ProgressBar";
 import TickIcon from "./TickIcon";
 import Modal from "./Modal";
+import { useCookies } from "react-cookie";
 
 export default function ListItem({ task, getData }) {
+  const [cookie, setCookie, removeCookie] = useCookies(null);
   const [showModal, setShowModal] = useState(false);
 
   /* ------------------- ENDPOINT TO DELETE A SPECIFIC TODO ----------------------*/
@@ -13,6 +15,9 @@ export default function ListItem({ task, getData }) {
         `${process.env.REACT_APP_SERVERURL}/todos/${task.id}`,
         {
           method: "DELETE",
+          headers: {
+            'X-Token': cookie.AuthToken,
+          }
         }
       );
       if (response.status === 200) {
