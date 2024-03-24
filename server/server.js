@@ -14,6 +14,7 @@ app.use(express.json());
 app.get("/todos/:userEmail", async (req, res) => {
   const { userEmail } = req.params;
   try {
+    // qui stai autorizzando l'utente ad accedere alla sua todos
     const todos = await pool.query("SELECT * FROM todos WHERE user_email=$1", [
       userEmail,
     ]);
@@ -24,7 +25,9 @@ app.get("/todos/:userEmail", async (req, res) => {
   }
 });
 
-/* ------------------- POST / INSERT A NEW ELEMENT TO DATABASE ----------------------*/
+/* ------------------- POST / INSERT A NEW ELEMENT TO DATABASE   
+(Quando qualcuno fa una post dal lato client, segue questo codice qui)
+----------------------*/
 app.post("/todos", async (req, res) => {
   const { user_email, title, progress, date } = req.body;
   console.log("req.body", req.body);
