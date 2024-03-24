@@ -17,8 +17,17 @@ function App() {
     try {
       // richiesta fetch per effettuare la richiesta al server locale
       const response = await fetch(
-        `${process.env.REACT_APP_SERVERURL}/todos/${userEmail}`
+        `${process.env.REACT_APP_SERVERURL}/todos`,
+        {
+          headers: {
+            'X-Token': cookie.AuthToken
+          }
+        }
       );
+      //se la risposta non è 200, lanciamo un errore
+      if (!response.ok) {
+        throw new Error("Unauthorized");
+      }
       //json.() serve a convertire la risposta in un oggetto Javascript
       const json = await response.json();
       //per aggiornare lo stato con i dati ricevuti

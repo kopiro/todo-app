@@ -8,7 +8,6 @@ export default function Modal({ mode, setShowModal, getData, task }) {
 
   //settiamo data come le proprietà presenti nella nostra tabella.
   const [data, setData] = useState({
-    user_email: editMmode ? task.user_email : cookie.Email,
     title: editMmode ? task.title : "",
     progress: editMmode ? task.progress : 50,
     date: editMmode ? "" : new Date(),
@@ -20,7 +19,10 @@ export default function Modal({ mode, setShowModal, getData, task }) {
     try {
       const response = await fetch(`${process.env.REACT_APP_SERVERURL}/todos`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json", 
+          "X-Token": cookie.AuthToken 
+        },
         body: JSON.stringify(data),
       });
       if (response.status === 200) {
@@ -41,7 +43,10 @@ export default function Modal({ mode, setShowModal, getData, task }) {
         `${process.env.REACT_APP_SERVERURL}/todos/${task.id}`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            'X-Token': cookie.AuthToken 
+          },
           body: JSON.stringify(data),
         }
       );
