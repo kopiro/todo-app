@@ -16,7 +16,7 @@ function App() {
   const getData = async () => {
     try {
       // richiesta fetch per effettuare la richiesta al server locale
-      const response = await fetch(
+      const response = fetch(
         `${process.env.REACT_APP_SERVERURL}/todos`,
         {
           headers: {
